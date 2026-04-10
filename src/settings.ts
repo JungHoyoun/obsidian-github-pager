@@ -7,6 +7,7 @@ export interface GitHubPagerSettings {
 	commitMessage: string;
 	autoSync: boolean;
 	syncInterval: number; // in minutes
+	defaultBranch: string; // default branch for batch commits
 }
 
 export const DEFAULT_SETTINGS: GitHubPagerSettings = {
@@ -17,5 +18,6 @@ export const DEFAULT_SETTINGS: GitHubPagerSettings = {
 	imagePath: 'static/images',
 	commitMessage: 'Update {{file}} via Obsidian',
 	autoSync: false,
-	syncInterval: 15
+	syncInterval: 15,
+	defaultBranch: 'main'
 }
