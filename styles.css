@@ -6,3 +6,22 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.github-pager-mapping-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.github-pager-mapping-item .mapping-path {
+    flex: 1;
+}
+
+.github-pager-mapping-item .mapping-path.disabled {
+    opacity: 0.5;
+}
+
+.github-pager-mapping-list {
+    margin-bottom: 8px;
+}

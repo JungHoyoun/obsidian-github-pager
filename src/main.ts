@@ -233,7 +233,7 @@ export default class GitHubPagerPlugin extends Plugin {
 
 	initFileMapper() {
 		this.fileMapper = new FileMapper(this);
-		this.fileMapper.loadMappings();
+		void this.fileMapper.loadMappings();
 		this.syncEngine = new SyncEngine(this, this.fileMapper);
 		this.syncEngine.start();
 	}

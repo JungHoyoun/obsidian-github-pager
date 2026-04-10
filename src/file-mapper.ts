@@ -1,5 +1,10 @@
-import { App, TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import GitHubPagerPlugin from './main';
+
+interface PluginData {
+    mappings?: FileMapping[];
+    [key: string]: unknown;
+}
 
 export interface FileMapping {
     localPath: string;
@@ -17,7 +22,7 @@ export class FileMapper {
     }
 
     async loadMappings(): Promise<FileMapping[]> {
-        const data = await this.plugin.loadData();
+        const data = await this.plugin.loadData() as PluginData;
         if (data && Array.isArray(data.mappings)) {
             this.mappings = data.mappings;
         }
@@ -25,7 +30,7 @@ export class FileMapper {
     }
 
     async saveMappings(): Promise<void> {
-        const data = await this.plugin.loadData();
+        const data = await this.plugin.loadData() as PluginData;
         await this.plugin.saveData({
             ...data,
             mappings: this.mappings

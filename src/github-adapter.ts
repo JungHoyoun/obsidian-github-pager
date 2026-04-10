@@ -95,7 +95,7 @@ export class GitHubAdapter {
             if (!fileData.content) {
                 return null;
             }
-            return Buffer.from(fileData.content, 'base64').toString('utf-8');
+            return atob(fileData.content);
         } catch (e: unknown) {
             const error = e as { status: number };
             if (error.status === 404) {
@@ -109,7 +109,7 @@ export class GitHubAdapter {
         const remoteContent = await this.getFileContent(path);
         if (remoteContent === null) return true;
 
-        const remoteBase64 = Buffer.from(remoteContent).toString('base64');
+        const remoteBase64 = btoa(remoteContent);
         return remoteBase64 !== localContentBase64;
     }
 
@@ -133,7 +133,7 @@ export class GitHubAdapter {
                             repo: this.repo,
                         });
                         targetBranch = repoData.default_branch;
-                        console.log(`Branch "${branch}" not found, using default branch "${targetBranch}"`);
+                        console.warn(`Branch "${branch}" not found, using default branch "${targetBranch}"`);
                     } else {
                         throw e;
                     }
@@ -210,7 +210,7 @@ export class GitHubAdapter {
 
                 // Wait before retry (exponential backoff: 1s, 2s, 4s)
                 const delay = Math.pow(2, attempt) * 1000;
-                console.log(`Retrying in ${delay}ms...`);
+                console.warn(`Retrying in ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
