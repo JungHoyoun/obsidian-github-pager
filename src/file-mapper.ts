@@ -61,7 +61,7 @@ export class FileMapper {
         return undefined;
     }
 
-    async getRemoteFilePath(localPath: string, file: TFile): Promise<string | null> {
+    getRemoteFilePath(localPath: string, file: TFile): string | null {
         const mapping = this.findMappingByPath(localPath);
         if (mapping && mapping.enabled) {
             return mapping.remoteFilePath;

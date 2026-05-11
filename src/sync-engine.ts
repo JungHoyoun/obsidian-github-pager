@@ -58,7 +58,7 @@ export class SyncEngine {
                 const contentBase64 = arrayBufferToBase64(data.buffer);
 
                 // Get remote path
-                const remoteFilePath = await this.fileMapper.getRemoteFilePath(file.path, file);
+                const remoteFilePath = this.fileMapper.getRemoteFilePath(file.path, file);
                 let remotePath: string;
                 if (remoteFilePath) {
                     if (remoteFilePath.includes('.')) {

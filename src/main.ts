@@ -157,7 +157,7 @@ export default class GitHubPagerPlugin extends Plugin {
 		// Try to get remote file path from mapping table first
 		let remotePath: string;
 		if (this.fileMapper) {
-			const mappedPath = await this.fileMapper.getRemoteFilePath(file.path, file);
+			const mappedPath = this.fileMapper.getRemoteFilePath(file.path, file);
 			if (mappedPath) {
 				// If mappedPath contains a file extension, use it directly as full path
 				// Otherwise treat it as a directory and append local filename
