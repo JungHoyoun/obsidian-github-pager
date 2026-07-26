@@ -69,7 +69,7 @@ export class GitHubAdapter {
 		files: RemoteFile[],
 		deletePaths: string[],
 		message: string,
-		retries = 3,
+		retries = 5,
 	): Promise<boolean> {
 		const changedFiles: RemoteFile[] = [];
 		for (const file of files) {
@@ -164,5 +164,5 @@ function isStatus(error: unknown, status: number): boolean {
 }
 
 function delay(milliseconds: number): Promise<void> {
-	return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+	return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
 }

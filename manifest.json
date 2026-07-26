@@ -1,7 +1,7 @@
 {
 	"id": "github-pager",
 	"name": "GitHub Pager",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"minAppVersion": "1.11.5",
 	"description": "Securely publish approved Slip-box notes to a Jekyll GitHub Pages site.",
 	"author": "Cloudac7, JungHoyoun",
