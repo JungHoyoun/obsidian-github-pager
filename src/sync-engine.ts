@@ -1,110 +1,63 @@
-import { TFile, debounce, Notice, Debouncer, arrayBufferToBase64 } from "obsidian";
-import GitHubPagerPlugin from "./main";
-import { FileMapper } from "./file-mapper";
+import { Notice, TFile } from "obsidian";
+import type GitHubPagerPlugin from "./main";
+import { isWithinSourceRoot } from "./publishing";
+import { PUBLISH_TARGET } from "./settings";
 
 export class SyncEngine {
-    plugin: GitHubPagerPlugin;
-    fileMapper: FileMapper;
-    syncQueue: Set<string> = new Set();
-    debouncedProcess: Debouncer<[], Promise<void>>;
+	private readonly timers = new Map<string, number>();
 
-    constructor(plugin: GitHubPagerPlugin, fileMapper: FileMapper) {
-        this.plugin = plugin;
-        this.fileMapper = fileMapper;
-        this.debouncedProcess = debounce(this.processQueue.bind(this), 2000, true);
-    }
+	constructor(private readonly plugin: GitHubPagerPlugin) {}
 
-    start() {
-        this.plugin.registerEvent(
-            this.plugin.app.vault.on('modify', (file) => {
-                if (file instanceof TFile && this.plugin.settings.autoSync) {
-                    this.onModify(file);
-                }
-            })
-        );
-    }
+	start(): void {
+		this.plugin.registerEvent(
+			this.plugin.app.vault.on("modify", (file) => {
+				if (!(file instanceof TFile) || !this.plugin.settings.autoSync) return;
+				if (!this.shouldTrack(file)) return;
+				this.schedule(file);
+			}),
+		);
+		this.plugin.registerEvent(
+			this.plugin.app.vault.on("rename", async (file, oldPath) => {
+				if (file instanceof TFile) {
+					await this.plugin.fileMapper.rename(oldPath, file.path);
+				}
+			}),
+		);
+	}
 
-    onModify(file: TFile) {
-        // Check if file has an enabled mapping
-        const mapping = this.fileMapper.getMapping(file.path);
-        if (mapping && mapping.enabled) {
-            this.syncQueue.add(file.path);
-            this.debouncedProcess();
-            return;
-        }
+	cancel(path: string): void {
+		const timer = this.timers.get(path);
+		if (timer !== undefined) {
+			window.clearTimeout(timer);
+			this.timers.delete(path);
+		}
+	}
 
-        // Fallback: check share frontmatter (backward compatibility)
-        const cache = this.plugin.app.metadataCache.getFileCache(file);
-        if (cache?.frontmatter?.share === true) {
-            this.syncQueue.add(file.path);
-            this.debouncedProcess();
-        }
-    }
+	stop(): void {
+		for (const timer of this.timers.values()) window.clearTimeout(timer);
+		this.timers.clear();
+	}
 
-    async processQueue() {
-        if (!this.plugin.githubAdapter || !this.plugin.processor) return;
+	private shouldTrack(file: TFile): boolean {
+		if (!isWithinSourceRoot(file.path, PUBLISH_TARGET.sourceRoot)) return false;
+		const frontmatter = this.plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+		return frontmatter?.share === true || this.plugin.fileMapper.get(file.path) !== undefined;
+	}
 
-        const paths = Array.from(this.syncQueue);
-        this.syncQueue.clear();
+	private schedule(file: TFile): void {
+		this.cancel(file.path);
+		const delay = Math.max(1, this.plugin.settings.debounceMinutes) * 60_000;
+		const timer = window.setTimeout(() => {
+			this.timers.delete(file.path);
+			void this.plugin.publishOrUnpublish(file, true).catch((error) => {
+				console.error(error);
+				new Notice(`GitHub Pager: ${formatError(error)}`);
+			});
+		}, delay);
+		this.timers.set(file.path, timer);
+	}
+}
 
-        // Collect files with changes for batch sync
-        const filesToSync: { path: string; localPath: string; contentBase64: string }[] = [];
-
-        for (const path of paths) {
-            const file = this.plugin.app.vault.getAbstractFileByPath(path);
-            if (file instanceof TFile) {
-                const content = await this.plugin.processor.process(file);
-                const data = new TextEncoder().encode(content);
-                const contentBase64 = arrayBufferToBase64(data.buffer);
-
-                // Get remote path
-                const remoteFilePath = this.fileMapper.getRemoteFilePath(file.path, file);
-                let remotePath: string;
-                if (remoteFilePath) {
-                    if (remoteFilePath.includes('.')) {
-                        remotePath = remoteFilePath.replace(/^\//, '');
-                    } else {
-                        const base = remoteFilePath.replace(/^\//, '').replace(/\/$/, '');
-                        remotePath = base ? `${base}/${file.name}` : file.name;
-                    }
-                } else {
-                    const base = this.plugin.settings.basePath.replace(/^\//, '').replace(/\/$/, '');
-                    remotePath = base ? `${base}/${file.name}` : file.name;
-                }
-
-                if (await this.plugin.githubAdapter.hasChanges(remotePath, contentBase64)) {
-                    filesToSync.push({ path: remotePath, localPath: path, contentBase64 });
-                }
-            }
-        }
-
-        if (filesToSync.length === 0) {
-            return; // Nothing to sync
-        }
-
-        if (filesToSync.length === 1) {
-            // Single file - use regular push
-            const f = filesToSync[0]!;
-            const file = this.plugin.app.vault.getAbstractFileByPath(f.localPath);
-            if (file instanceof TFile) {
-                new Notice(`Auto-syncing ${file.name}...`);
-                await this.plugin.pushFile(file, false);
-            }
-            return;
-        }
-
-        // Multiple files - use batch sync
-        const fileList = filesToSync.map(f => ({ path: f.path, contentBase64: f.contentBase64 }));
-        const message = `Auto-sync ${filesToSync.length} files via Obsidian`;
-
-        new Notice(`Auto-syncing ${filesToSync.length} files...`);
-        const success = await this.plugin.githubAdapter.pushFilesBatch(fileList, message, this.plugin.settings.defaultBranch);
-
-        if (success) {
-            for (const f of filesToSync) {
-                await this.fileMapper.updateLastSynced(f.localPath);
-            }
-            new Notice(`Auto-sync complete: ${filesToSync.length} files.`);
-        }
-    }
+function formatError(error: unknown): string {
+	return error instanceof Error ? error.message : "Automatic publish failed.";
 }

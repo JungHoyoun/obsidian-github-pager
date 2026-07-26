@@ -1,143 +1,41 @@
-import { TFile } from 'obsidian';
-import GitHubPagerPlugin from './main';
-
-interface PluginData {
-    mappings?: FileMapping[];
-    [key: string]: unknown;
-}
-
-export interface FileMapping {
-    localPath: string;
-    remoteFilePath: string;
-    enabled: boolean;
-    lastSynced?: string;
-}
+import type GitHubPagerPlugin from "./main";
+import type { PublishedRecord } from "./settings";
 
 export class FileMapper {
-    plugin: GitHubPagerPlugin;
-    mappings: FileMapping[] = [];
+	private readonly plugin: GitHubPagerPlugin;
+	records: PublishedRecord[] = [];
 
-    constructor(plugin: GitHubPagerPlugin) {
-        this.plugin = plugin;
-    }
+	constructor(plugin: GitHubPagerPlugin) {
+		this.plugin = plugin;
+	}
 
-    async loadMappings(): Promise<FileMapping[]> {
-        const data = await this.plugin.loadData() as PluginData;
-        if (data && Array.isArray(data.mappings)) {
-            this.mappings = data.mappings;
-        }
-        return this.mappings;
-    }
+	load(records: PublishedRecord[]): void {
+		this.records = records;
+	}
 
-    async saveMappings(): Promise<void> {
-        const data = await this.plugin.loadData() as PluginData;
-        await this.plugin.saveData({
-            ...data,
-            mappings: this.mappings
-        });
-    }
+	get(localPath: string): PublishedRecord | undefined {
+		return this.records.find((record) => record.localPath === localPath);
+	}
 
-    getMapping(localPath: string): FileMapping | undefined {
-        return this.mappings.find(m => m.localPath === localPath);
-    }
+	async upsert(record: PublishedRecord): Promise<void> {
+		const index = this.records.findIndex((candidate) => candidate.localPath === record.localPath);
+		if (index >= 0) {
+			this.records[index] = record;
+		} else {
+			this.records.push(record);
+		}
+		await this.plugin.persistData();
+	}
 
-    findMappingByPath(localPath: string): FileMapping | undefined {
-        // 1. Exact match
-        let mapping = this.getMapping(localPath);
-        if (mapping) return mapping;
+	async remove(localPath: string): Promise<void> {
+		this.records = this.records.filter((record) => record.localPath !== localPath);
+		await this.plugin.persistData();
+	}
 
-        // 2. No .md suffix -> try adding .md
-        if (!localPath.endsWith('.md')) {
-            mapping = this.getMapping(localPath + '.md');
-            if (mapping) return mapping;
-        }
-
-        // 3. Has .md suffix -> try removing it
-        if (localPath.endsWith('.md')) {
-            mapping = this.getMapping(localPath.replace(/\.md$/, ''));
-            if (mapping) return mapping;
-        }
-
-        return undefined;
-    }
-
-    getRemoteFilePath(localPath: string, file: TFile): string | null {
-        const mapping = this.findMappingByPath(localPath);
-        if (mapping && mapping.enabled) {
-            return mapping.remoteFilePath;
-        }
-
-        // Fallback to frontmatter remote_path
-        const cache = this.plugin.app.metadataCache.getFileCache(file);
-        const frontmatter = cache?.frontmatter;
-        if (frontmatter?.remote_path && typeof frontmatter.remote_path === 'string') {
-            return frontmatter.remote_path;
-        }
-
-        return null;
-    }
-
-    async autoAddMapping(localPath: string, remoteFilePath: string): Promise<void> {
-        const existing = this.getMapping(localPath);
-        if (existing) return;
-
-        this.mappings.push({
-            localPath,
-            remoteFilePath,
-            enabled: true
-        });
-        await this.saveMappings();
-    }
-
-    async addMapping(localPath: string, remoteFilePath: string): Promise<void> {
-        const existing = this.getMapping(localPath);
-        if (existing) {
-            existing.remoteFilePath = remoteFilePath;
-            existing.enabled = true;
-        } else {
-            this.mappings.push({
-                localPath,
-                remoteFilePath,
-                enabled: true
-            });
-        }
-        await this.saveMappings();
-    }
-
-    async removeMapping(localPath: string): Promise<void> {
-        this.mappings = this.mappings.filter(m => m.localPath !== localPath);
-        await this.saveMappings();
-    }
-
-    async toggleMapping(localPath: string, enabled: boolean): Promise<void> {
-        const mapping = this.getMapping(localPath);
-        if (mapping) {
-            mapping.enabled = enabled;
-            await this.saveMappings();
-        }
-    }
-
-    async updateMapping(localPath: string, newRemotePath: string): Promise<void> {
-        const mapping = this.getMapping(localPath);
-        if (mapping) {
-            mapping.remoteFilePath = newRemotePath;
-            await this.saveMappings();
-        }
-    }
-
-    async updateLastSynced(localPath: string): Promise<void> {
-        const mapping = this.getMapping(localPath);
-        if (mapping) {
-            mapping.lastSynced = new Date().toISOString();
-            await this.saveMappings();
-        }
-    }
-
-    getEnabledMappings(): FileMapping[] {
-        return this.mappings.filter(m => m.enabled);
-    }
-
-    async addMappingFromFile(file: TFile, remoteFilePath: string): Promise<void> {
-        await this.addMapping(file.path, remoteFilePath);
-    }
+	async rename(oldPath: string, newPath: string): Promise<void> {
+		const record = this.get(oldPath);
+		if (!record) return;
+		record.localPath = newPath;
+		await this.plugin.persistData();
+	}
 }
