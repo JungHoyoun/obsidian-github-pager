@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-github-pager",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "Securely publish approved Slip-box notes to JungHoyoun.github.io.",
 	"main": "main.js",
 	"type": "module",
