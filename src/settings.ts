@@ -1,23 +1,36 @@
 export interface GitHubPagerSettings {
-	githubToken: string;
-	repositoryOwner: string;
-	repositoryName: string;
-	basePath: string; // e.g., "content/posts"
-	imagePath: string; // e.g., "static/images"
-	commitMessage: string;
+	githubTokenSecretId: string;
 	autoSync: boolean;
-	syncInterval: number; // in minutes
-	defaultBranch: string; // default branch for batch commits
+	debounceMinutes: number;
 }
 
-export const DEFAULT_SETTINGS: GitHubPagerSettings = {
-	githubToken: '',
-	repositoryOwner: '',
-	repositoryName: '',
-	basePath: 'content/posts',
-	imagePath: 'static/images',
-	commitMessage: 'Update {{file}} via Obsidian',
-	autoSync: false,
-	syncInterval: 15,
-	defaultBranch: 'main'
+export interface PublishedRecord {
+	localPath: string;
+	remotePath: string;
+	slug: string;
+	lastSynced: string;
 }
+
+export interface StoredPluginData extends GitHubPagerSettings {
+	publishedRecords: PublishedRecord[];
+}
+
+export const PUBLISH_TARGET = {
+	owner: "JungHoyoun",
+	repository: "JungHoyoun.github.io",
+	branch: "main",
+	sourceRoot: "0. Slip-box/",
+	postsPath: "_posts",
+	imagePath: "assets/img/posts",
+} as const;
+
+export const DEFAULT_SETTINGS: GitHubPagerSettings = {
+	githubTokenSecretId: "",
+	autoSync: false,
+	debounceMinutes: 10,
+};
+
+export const DEFAULT_DATA: StoredPluginData = {
+	...DEFAULT_SETTINGS,
+	publishedRecords: [],
+};
